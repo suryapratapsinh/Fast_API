@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI City Search Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+        /* Styling for suggestion boxes */
+        .suggestions {
+            border: 1px solid #ccc;
+            background-color: #fff;
+            max-height: 150px;
+            overflow-y: auto;
+            border-radius: 4px;
+            position: absolute;
+            z-index: 1000;
+            width: 100%;
+        }
+        .suggestions div {
+            padding: 8px;
+            cursor: pointer;
+        }
+        .suggestions div:hover {
+            background-color: #f1f1f1;
+        }
+        /* Loading spinner styling */
+        #loading {
+            display: none;
+            text-align: center;
+            font-size: 18px;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+
+<h1>City Search and Download</h1>
+
+<div class="form-group">
+    <label for="city">City:</label>
+    <input type="text" id="city" placeholder="Enter city name" oninput="suggestCity()">
+    <div id="city-suggestions" class="suggestions"></div>
+</div>
+
+<button onclick="fetchData()">Fetch City Data</button>
+
+<!-- Loading indicator -->
+<div id="loading">Loading...</div>
+
+<div class="result" id="result"></div>
+
+<script>
+    // Function to fetch and show suggestions for city as you type
+    async function suggestCity() {
+        const cityInput = document.getElementById('city');
+        const citySuggestions = document.getElementById('city-suggestions');
+        const city = cityInput.value;
+
+        if (city.length >= 2) {
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/suggest-city?partial_city=${encodeURIComponent(city)}`);
+                const data = await response.json();
+
+                citySuggestions.innerHTML = '';
+                data.suggestions.forEach(suggestion => {
+                    const div = document.createElement('div');
+                    div.textContent = suggestion;
+                    div.onclick = () => {
+                        cityInput.value = suggestion;
+                        clearSuggestions();
+                    };
+                    citySuggestions.appendChild(div);
+                });
+            } catch (error) {
+                console.error("Error fetching city suggestions:", error);
+            }
+        } else {
+            citySuggestions.innerHTML = '';
+        }
+    }
+
+    // Function to clear suggestions when "Enter" is pressed
+    function clearSuggestions() {
+        document.getElementById('city-suggestions').innerHTML = '';
+    }
+
+    // Detect when "Enter" is pressed in the city field and clear suggestions
+    document.getElementById('city').addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            clearSuggestions();
+        }
+    });
+
+    // Close suggestion boxes when clicking outside the input fields or suggestion boxes
+    document.addEventListener('click', (event) => {
+        const cityInput = document.getElementById('city');
+        const citySuggestions = document.getElementById('city-suggestions');
+
+        if (!cityInput.contains(event.target) && !citySuggestions.contains(event.target)) {
+            citySuggestions.innerHTML = '';
+        }
+    });
+
+    // Function to fetch city data after button click and show loading indicator
+    async function fetchData() {
+        const loadingIndicator = document.getElementById('loading');
+        const resultDiv = document.getElementById('result');
+        const cityInput = document.getElementById('city').value;
+
+        if (!cityInput) {
+            resultDiv.innerHTML = '<p class="error">Please enter a city name.</p>';
+            return;
+        }
+
+        // Show the loading indicator
+        loadingIndicator.style.display = 'block';
+
+        try {
+            // Fetch city data from the backend
+            const response = await fetch(`http://127.0.0.1:8000/get-data?city=${encodeURIComponent(cityInput)}&keyword=someKeyword`);
+            const data = await response.json();
+
+            // Hide the loading indicator
+            loadingIndicator.style.display = 'none';
+
+            // Display the fetched data
+            if (data.message) {
+                resultDiv.innerHTML = `
+                    <h3 class="success">${data.message}</h3>
+                    <p>Records found: ${data.record_count}</p>
+                    <a href="${data.download_url}" target="_blank">Click here to download the file</a>
+                `;
+            } else {
+                resultDiv.innerHTML = '<p class="error">No data found for this city.</p>';
+            }
+        } catch (error) {
+            // Hide the loading indicator in case of error
+            loadingIndicator.style.display = 'none';
+            resultDiv.innerHTML = `<p class="error">Error fetching city data: ${error.message}</p>`;
+        }
+    }
+</script>
+
+</body>
+</html>
